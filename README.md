@@ -92,7 +92,7 @@ To set up the Django Assistant Bot project, follow these steps:
    
    ```bash
    python -m venv venv
-   source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+   source venv/bin/activate
    ```
 
 3. **Install Requirements**: Install the project and its dependencies:
