@@ -6,6 +6,7 @@ import readline
 import sys
 import uuid
 import time
+import signal
 from datetime import timedelta
 from threading import Thread
 
@@ -43,27 +44,13 @@ class Command(BaseCommand):
         self.bot_codename = options['bot_codename']
         logger.info("Starting chat with auto-reload enabled")
 
-        # Set up the reloader in a separate thread
-        self.should_exit = False
-        reloader_thread = Thread(target=self._run_reloader)
-        reloader_thread.daemon = True
-        reloader_thread.start()
+        # Use Django's built-in autoreload functionality
+        autoreload.run_with_reloader(self._run_chat_main)
 
-        # Run the chat in the main thread
-        try:
-            self._run_chat()
-        finally:
-            self.should_exit = True
-            reloader_thread.join(timeout=1.0)
-
-    def _run_reloader(self):
-        """Run a custom reloader in a separate thread."""
-        reloader = autoreload.get_reloader()
-        while not self.should_exit:
-            if reloader.should_stop:
-                logger.info("Detected code changes. Restarting chat...")
-                os._exit(3)  # Use the same exit code as Django's autoreloader
-            time.sleep(0.1)
+    def _run_chat_main(self):
+        """Main entry point that will be run by the reloader."""
+        # The bot_codename is already set in handle() before autoreloading
+        self._run_chat()
 
     def _run_chat(self):
         platform_codename = 'console'
@@ -95,6 +82,11 @@ class Command(BaseCommand):
             except (KeyboardInterrupt, EOFError):
                 print("\nEnding interactive chat.")
                 break
+
+        # Ensure we properly close the loop
+        loop.close()
+        # Send SIGTERM to self to exit completely
+        os.kill(os.getpid(), signal.SIGTERM)
 
 
 class ConsolePlatform(BotPlatform):

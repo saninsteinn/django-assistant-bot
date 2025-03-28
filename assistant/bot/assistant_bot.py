@@ -13,7 +13,6 @@ from django.conf import settings
 from assistant.ai.dialog import AIDialog
 from assistant.ai.domain import AIResponse, Message as GPTMessage
 from assistant.ai.services.ai_service import extract_tagged_text, get_ai_provider
-from assistant.bot.chat_completion import ChatCompletion
 from assistant.bot.domain import Bot, Update, Answer, MultiPartAnswer, NoMessageFound, SingleAnswer, \
     Button, User, BotPlatform, Photo
 
@@ -23,7 +22,6 @@ from assistant.bot.resource_manager import ResourceManager
 from assistant.bot.services.dialog_service import get_dialog, create_bot_message, create_user_message, have_existing_answers, \
     get_gpt_messages
 from assistant.bot.utils import truncate_text
-from assistant.storage.models import Document, WikiDocument
 
 logger = logging.getLogger(__name__)
 
@@ -239,6 +237,7 @@ class AssistantBot(Bot):
         return answered
 
     async def get_answer_to_messages(self, messages, debug_info, do_interrupt) -> Answer:
+        from assistant.bot.chat_completion import ChatCompletion
         chat_completion = ChatCompletion(
             bot=self.bot,
             fast_ai_model=self._get_fast_ai_model(),
@@ -437,6 +436,7 @@ class AssistantBot(Bot):
         )
 
     def command_show_document(self, text):
+        from assistant.storage.models import Document
         doc_id = text.split()[1].strip()
         try:
             doc = Document.objects.filter(wiki__bot=self.bot).select_related('wiki').get(id=doc_id)
@@ -456,6 +456,7 @@ class AssistantBot(Bot):
         )
 
     def command_show_wiki(self, text):
+        from assistant.storage.models import WikiDocument
         wiki_id = text.split()[1].strip()
         try:
             wiki = WikiDocument.objects.filter(bot=self.bot).get(id=wiki_id)
