@@ -19,7 +19,7 @@ from models import embedder_models, provider_models
 
 app_log_path = os.getenv("GPU_SERVICE_APP_LOG", "app.log")
 
-# Настройка логирования
+# Logging setup
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',

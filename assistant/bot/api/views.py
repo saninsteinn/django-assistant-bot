@@ -131,10 +131,10 @@ class DialogViewSet(viewsets.ModelViewSet):
     # @action(detail=True, methods=['post'])
     # def run(self, request, pk=None):
     #     dialog = self.get_object()
-    #     # Получаем все сообщения в диалоге
+    #     # Get all messages in the dialog
     #     messages = dialog.messages.all().order_by('created_at')
     #
-    #     # Подготавливаем историю диалога для модели ИИ
+    #     # Prepare dialog history for AI model
     #     conversation = []
     #     for message in messages:
     #         conversation.append({
@@ -142,25 +142,25 @@ class DialogViewSet(viewsets.ModelViewSet):
     #             'content': message.content
     #         })
     #
-    #     # Вызываем модель ИИ для генерации ответа
+    #     # Call AI model to generate response
     #     assistant_response = self.generate_assistant_response(conversation)
     #
-    #     # Сохраняем ответ ассистента как новое сообщение
+    #     # Save assistant's response as a new message
     #     Message.objects.create(
     #         dialog=dialog,
     #         role='assistant',
     #         content=assistant_response
     #     )
     #
-    #     # Возвращаем обновленный диалог
+    #     # Return updated dialog
     #     serializer = self.get_serializer(dialog)
     #     return Response(serializer.data)
     #
     # def generate_assistant_response(self, conversation):
-    #     # Здесь интегрируйте вашу модель ИИ для генерации ответа
-    #     # Пример с использованием последнего сообщения пользователя
+    #     # Here integrate your AI model for generating response
+    #     # Example with using the last user message
     #     last_user_message = conversation[-1]['content'] if conversation else ''
-    #     return f"Ответ ассистента на: {last_user_message}"
+    #     return f"Assistant's response to: {last_user_message}"
 
 
 class MessageViewSet(mixins.CreateModelMixin,

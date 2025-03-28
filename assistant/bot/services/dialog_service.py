@@ -95,7 +95,7 @@ def create_user_message(dialog: Dialog, message_id: int, text: str = None, photo
     if photo:
         image_file = io.BytesIO(photo.content)
         logger.debug(f'Image file size: {len(image_file.getvalue())}')
-        # Создание InMemoryUploadedFile
+        # Create InMemoryUploadedFile
         photo_file = ContentFile(
             image_file.getvalue(),
             name=f"{photo.file_id}.{photo.extension}"

@@ -15,9 +15,8 @@ class TelegramBotPlatform(BotPlatform):
     def __init__(self, token: str):
         self.bot = Bot(token=token)
 
-    async def get_update(self, request: Request) -> Update:
-        logger.debug(f'Got Telegram request: {request.data}')
-        telegram_update = TelegramUpdate.de_json(request.data, self.bot)
+    async def convert_telegram_update(self, telegram_update: TelegramUpdate) -> Update:
+        """Convert a Telegram update to our Update object."""
         if telegram_update.message:
             user_data = telegram_update.message.from_user
         elif telegram_update.callback_query:
@@ -42,7 +41,7 @@ class TelegramBotPlatform(BotPlatform):
             if telegram_update.message.photo:
                 photo = telegram_update.message.photo[-1]
                 photo_file = await self.bot.get_file(photo.file_id)
-                photo_bytearray: bytearray = (await photo_file.download_as_bytearray())
+                photo_bytearray = await photo_file.download_as_bytearray()
                 photo = Photo(
                     file_id=photo.file_unique_id,
                     extension=photo_file.file_path.split('.')[-1],
@@ -64,6 +63,11 @@ class TelegramBotPlatform(BotPlatform):
             photo=photo,
             user=user,
         )
+
+    async def get_update(self, request: Request) -> Update:
+        logger.debug(f'Got Telegram request: {request.data}')
+        telegram_update = TelegramUpdate.de_json(request.data, self.bot)
+        return await self.convert_telegram_update(telegram_update)
 
     async def post_answer(self, chat_id: str, answer: SingleAnswer):
         logger.info(f"Answer Text: {answer.text}")

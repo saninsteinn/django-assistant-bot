@@ -18,9 +18,9 @@ class ClassifyStep(ContextProcessingStep):
     debug_info_key = 'classify'
 
     _offtopic_examples = [
-        ("Привет", "Отвлеченная беседа"),
-        ("Как дела?", "Отвлеченная беседа"),
-        ("Какая погода в Москве?", "Отвлеченная беседа")
+        ("Hello", "Small talk"),
+        ("How are you?", "Small talk"),
+        ("What's the weather in Moscow?", "Small talk")
     ]
 
     @ai_debugger
@@ -31,7 +31,7 @@ class ClassifyStep(ContextProcessingStep):
                 parent=None
             ))
         ))()
-        smalltalk_choice = 'Отвлеченная беседа'
+        smalltalk_choice = 'Small talk'
         topics = [smalltalk_choice] + [t.title for t in wds]
         examples = self._offtopic_examples + await sync_to_async(self._examples)(wds)
         new_messages = add_system_message(

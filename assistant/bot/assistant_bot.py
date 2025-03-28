@@ -56,9 +56,9 @@ class AssistantBot(Bot):
     @classmethod
     def command(cls, pattern: str):
         """
-        Декоратор для регистрации команды.
+        Decorator for registering a command.
 
-        :param pattern: Строка регулярного выражения для команды.
+        :param pattern: Regular expression string for the command.
         """
         def decorator(func: Callable):
             cls._command_handlers.append((re.compile(pattern), func))
@@ -79,7 +79,7 @@ class AssistantBot(Bot):
                 update.user.username in whitelist
             ):
                 return SingleAnswer(
-                    "`Требуется авторизация.`",
+                    "`Authorization required.`",
                     no_store=True,
                 )
 
@@ -132,11 +132,7 @@ class AssistantBot(Bot):
         photo = update.photo
 
         if not text and not photo:
-            # return Answer("`Sorry, only text messages are supported.`")
-            if self.vision_enabled:
-                return SingleAnswer("`Извините, поддерживаются только текстовые сообщения или фото.`", no_store=True)
-            else:
-                return SingleAnswer("`Извините, поддерживаются только текстовые сообщения.`", no_store=True)
+            return SingleAnswer("`Sorry, only text messages or photos are supported.`", no_store=True)
 
         if self.instance.state.get('mode') == 'image_creation':
             if text and text.startswith('/'):
@@ -256,7 +252,7 @@ class AssistantBot(Bot):
         return answer
 
     def _extract_thinking_tag(self, text: str) -> Optional[str]:
-        # Извлекаем контент между <think> и </think>
+        # Extract content between <think> and </think>
         match = re.search(r'<think>(.*?)</think>', text, flags=re.DOTALL)
         return match.group(1).strip() if match else None
 
@@ -266,13 +262,13 @@ class AssistantBot(Bot):
     def _ai_response_to_answer(self, ai_response: AIResponse) -> Optional[Answer]:
         original_text = ai_response.result
 
-        # Извлекаем аналитическую часть
+        # Extract analytical part
         thinking = self._extract_thinking_tag(original_text)
 
-        # Удаляем все thinking-теги из текста
+        # Remove all thinking tags from text
         cleaned_text = self._clean_thinking(original_text)
 
-        # Обрабатываем основной текст (существующая логика)
+        # Process main text (existing logic)
         if text_tag := self._extract_text_tag(cleaned_text):
             cleaned_text = text_tag
 
@@ -325,10 +321,7 @@ class AssistantBot(Bot):
             if text.startswith('/start'):
                 return await self.command_start(text)
             elif text == '/help':
-                if text := self.bot.help_text:
-                    return SingleAnswer(text, no_store=True)
-                else:
-                    return
+                return await self.command_help()
             elif text == '/continue':
                 return await self.command_continue(dialog, message_id)
             elif text == '/test_message':
@@ -351,13 +344,13 @@ class AssistantBot(Bot):
                 for pattern, handler in self._command_handlers:
                     match = pattern.match(text)
                     if match:
-                        # Определяем, является ли обработчик асинхронным
+                        # Determine if the handler is asynchronous
                         if asyncio.iscoroutinefunction(handler):
                             return await handler(self, match, message_id)
                         else:
                             return await sync_to_async(handler)(self, match, message_id)
 
-            return SingleAnswer("`Команда неизвестна.`", no_store=True)
+            return SingleAnswer("`Unknown command.`", no_store=True)
         except Exception as e:
             logger.exception('Failed to handle command')
             return SingleAnswer(
@@ -378,7 +371,7 @@ class AssistantBot(Bot):
 
     def command_new_dialog(self) -> SingleAnswer:
         Dialog.objects.filter(instance=self.instance, is_completed=False).update(is_completed=True)
-        return SingleAnswer("`Новый диалог начат.`", no_store=True)
+        return SingleAnswer("`New dialog started.`", no_store=True)
 
     def command_show_dialogs(self):
         dialogs = Dialog.objects.annotate(messages_count=Count('messages')).filter(messages_count__gt=0).order_by(
@@ -502,3 +495,8 @@ class AssistantBot(Bot):
         await sync_to_async(
             lambda: self.instance.save(update_fields=['state'])
         )()
+
+    async def command_help(self) -> Optional[SingleAnswer]:
+        if text := self.bot.help_text:
+            return SingleAnswer(text, no_store=True)
+        return None

@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class TaskManagerBot(AssistantBot):
+
     async def get_answer_to_messages(self, messages, debug_info, do_interrupt) -> Answer:
         if self.instance.state.get('awaiting_input'):
             return await self.handle_state_input(messages, debug_info)
@@ -30,10 +31,10 @@ class TaskManagerBot(AssistantBot):
 
     async def _classify_intent(self, messages, debug_info) -> str:
         with AIDebugger(self._fast_ai, debug_info, 'intent_classification') as debugger:
-            system_msg = """Классифицируй запрос пользователя выше:
-            #create_task - создание новой задачи
-            #list_tasks - запрос списка задач
-            #other - другие запросы"""
+            system_msg = """Classify the user request above:
+            #create_task - creating a new task
+            #list_tasks - request task list
+            #other - other requests"""
 
             response = await repeat_until(
                 debugger.ai.get_response,
@@ -81,8 +82,8 @@ class TaskManagerBot(AssistantBot):
             'new_task': {}
         })
         return SingleAnswer(
-            "📝 Введите название задачи:",
-            buttons=[[Button('Отмена', callback_data='/cancel')]]
+            "📝 Enter task name:",
+            buttons=[[Button('Cancel', callback_data='/cancel')]]
         )
 
     async def handle_state_input(self, messages, debug_info):
@@ -95,17 +96,17 @@ class TaskManagerBot(AssistantBot):
 
             await self.update_state(state)
             return SingleAnswer(
-                "Выберите приоритет:",
+                "Choose priority:",
                 buttons=[
-                    [Button('❗Высокий', callback_data='/priority high')],
-                    [Button('🔰 Средний', callback_data='/priority medium')],
-                    [Button('🐌 Низкий', callback_data='/priority low')]
+                    [Button('❗High', callback_data='/priority high')],
+                    [Button('🔰 Medium', callback_data='/priority medium')],
+                    [Button('🐌 Low', callback_data='/priority low')]
                 ]
             )
 
         elif state['awaiting_input'] == 'task_priority':
             return SingleAnswer(
-                "✅ Задача успешно создана!",
+                "✅ Task created successfully!",
                 no_store=True
             )
 
@@ -116,17 +117,17 @@ class TaskManagerBot(AssistantBot):
         await self.update_state(self.instance.state)
 
         return MultiPartAnswer([
-            SingleAnswer(f"Выбран приоритет: {priority}"),
+            SingleAnswer(f"Selected priority: {priority}"),
             await self._confirm_task_creation()
         ])
 
     async def _confirm_task_creation(self):
         task = self.instance.state['new_task']
         return SingleAnswer(
-            f"Создать задачу?\n{task['title']} ({task['priority']} приоритет)",
+            f"Create task?\n{task['title']} ({task['priority']} priority)",
             buttons=[
-                [Button('✅ Подтвердить', callback_data='/confirm_task')],
-                [Button('❌ Отмена', callback_data='/cancel')]
+                [Button('✅ Confirm', callback_data='/confirm_task')],
+                [Button('❌ Cancel', callback_data='/cancel')]
             ]
         )
 
@@ -137,12 +138,12 @@ class TaskManagerBot(AssistantBot):
         await self.clear_state()
 
         return MultiPartAnswer([
-            SingleAnswer("🎉 Задача создана!"),
+            SingleAnswer("🎉 Task created!"),
             SingleAnswer(
-                "Что дальше?",
+                "What's next?",
                 buttons=[
-                    [Button('➕ Новая задача', callback_data='/new_task')],
-                    [Button('📋 Список задач', callback_data='/list')]
+                    [Button('➕ New task', callback_data='/new_task')],
+                    [Button('📋 Task list', callback_data='/list')]
                 ]
             )
         ])
@@ -165,23 +166,52 @@ class TaskManagerBot(AssistantBot):
         return SingleAnswer(formatted_response)
 
     @AssistantBot.command('/cancel')
-    async def cancel_operation(self):
+    async def cancel_operation(self, match=None, message_id=None):
         await self.clear_state()
         return SingleAnswer(
-            "❌ Операция отменена",
-            buttons=[[Button('Главное меню', callback_data='/start')]]
+            "❌ Operation cancelled",
+            buttons=[[Button('Main menu', callback_data='/start')]]
         )
 
     @AssistantBot.command('/start')
     async def command_start(self, *args, **kwargs):
         return MultiPartAnswer([
-            SingleAnswer("🖖 Добро пожаловать в TaskBot!"),
+            SingleAnswer("🖖 Welcome to TaskBot!"),
             SingleAnswer(
-                "Выберите действие:",
+                "Choose action:",
                 buttons=[
-                    [Button('➕ Новая задача', callback_data='/new_task')],
-                    [Button('📋 Мои задачи', callback_data='/list')],
-                    [Button('❓ Помощь', callback_data='/help')]
+                    [Button('➕ New task', callback_data='/new_task')],
+                    [Button('📋 My tasks', callback_data='/list')],
+                    [Button('❓ Help', callback_data='/help')]
                 ]
             )
         ])
+
+    @AssistantBot.command('/list')
+    async def command_list(self, *args, **kwargs):
+        return await self.show_task_list()
+
+    async def show_task_list(self):
+        return SingleAnswer(
+            "📋 Task list:\n\n"
+            "Currently, the task list is empty.",
+            buttons=[
+                [Button('➕ New task', callback_data='/new_task')],
+                [Button('🏠 Main menu', callback_data='/start')]
+            ]
+        )
+
+    @AssistantBot.command('/help')
+    async def command_help(self, *args, **kwargs):
+        return SingleAnswer(
+            "🤖 *TaskBot - Task Management*\n\n"
+            "📝 *Commands:*\n\n"
+            "• /new_task - Create a task\n"
+            "• /list - Task list\n"
+            "• /cancel - Cancel operation\n"
+            "• /start - Main menu",
+            buttons=[
+                [Button('🏠 Main menu', callback_data='/start')],
+                [Button('➕ New task', callback_data='/new_task')]
+            ]
+        )
