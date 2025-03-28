@@ -36,7 +36,7 @@ DEBUG = ENV.bool('DEBUG', default=False)
 
 ALLOWED_HOSTS = ENV('ALLOWED_HOSTS').split(',')
 
-TELEGRAM_BASE_CALLBACK_URL = ENV.str('TELEGRAM_BASE_CALLBACK_URL')
+TELEGRAM_BASE_CALLBACK_URL = ENV.str('TELEGRAM_BASE_CALLBACK_URL', default=None)
 
 # Database
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases

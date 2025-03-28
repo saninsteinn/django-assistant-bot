@@ -21,7 +21,9 @@ class Bot(models.Model):
 
     @property
     def callback_url(self):
-        base_callback_url = settings.TELEGRAM_BASE_CALLBACK_URL
+        base_callback_url = getattr(settings, 'TELEGRAM_BASE_CALLBACK_URL', None)
+        if not base_callback_url:
+            return None
         if self.codename:
             return urljoin(base_callback_url, reverse('telegram_bot', kwargs={'codename': self.codename}))
 

@@ -29,8 +29,11 @@ def bot_post_save(sender, instance, created, **kwargs):
             instance.telegram_token != instance._original_instance.telegram_token or
             instance.callback_url != instance._original_instance.callback_url
     ):
-        logging.info(f'Setting webhook {instance.callback_url} for bot {instance.codename}')
-        _set_webhook(instance.telegram_token, instance.callback_url)
+        if instance.callback_url:
+            logging.info(f'Setting webhook {instance.callback_url} for bot {instance.codename}')
+            _set_webhook(instance.telegram_token, instance.callback_url)
+        else:
+            logging.info(f'Skipping webhook setup for bot {instance.codename} - callback_url is not set')
     else:
         logging.debug(f'Webhook for bot {instance.codename} is already set')
 
