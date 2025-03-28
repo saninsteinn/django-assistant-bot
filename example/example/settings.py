@@ -53,8 +53,12 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 
 
-BOT_CLASSES = {
-    'task_manager': 'bot.bot.TaskManagerBot',
+# Bot configuration
+BOTS = {
+    'task_manager': {
+        'class': 'bot.bot.TaskManagerBot',
+        'telegram_token': ENV.str('TASK_MANAGER_BOT_TOKEN', default=None),
+    },
 }
 
 

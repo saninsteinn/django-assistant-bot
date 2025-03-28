@@ -30,7 +30,7 @@ class TaskManagerBot(AssistantBot):
 
     async def _classify_intent(self, messages, debug_info) -> str:
         with AIDebugger(self._fast_ai, debug_info, 'intent_classification') as debugger:
-            system_msg = """Классифицируй запрос:
+            system_msg = """Классифицируй запрос пользователя выше:
             #create_task - создание новой задачи
             #list_tasks - запрос списка задач
             #other - другие запросы"""
@@ -43,8 +43,37 @@ class TaskManagerBot(AssistantBot):
             )
 
             intent = self._clean_thinking(response.result).strip()
+            debugger.info['messages'] = messages
             debugger.info['detected_intent'] = intent
             return intent
+
+    def _validate_classification(self, result: str) -> bool:
+        """
+        Validate that the classification result contains one of the expected intent tags.
+
+        Args:
+            result: The classification response from the AI
+
+        Returns:
+            bool: True if the result contains a valid classification tag, False otherwise
+        """
+        valid_intents = ['#create_task', '#list_tasks', '#other']
+        return any(intent in result for intent in valid_intents)
+
+    def _clean_thinking(self, result: str) -> str:
+        """
+        Extract the classification tag from the AI response, removing any reasoning or additional text.
+
+        Args:
+            result: The raw classification response from the AI
+
+        Returns:
+            str: The extracted classification tag
+        """
+        for intent in ['#create_task', '#list_tasks', '#other']:
+            if intent in result:
+                return intent
+        return '#other'  # Default fallback
 
     async def initiate_task_creation(self):
         await self.update_state({
@@ -53,7 +82,7 @@ class TaskManagerBot(AssistantBot):
         })
         return SingleAnswer(
             "📝 Введите название задачи:",
-            buttons=[Button('Отмена', callback_data='/cancel')]
+            buttons=[[Button('Отмена', callback_data='/cancel')]]
         )
 
     async def handle_state_input(self, messages, debug_info):
@@ -68,9 +97,9 @@ class TaskManagerBot(AssistantBot):
             return SingleAnswer(
                 "Выберите приоритет:",
                 buttons=[
-                    Button('❗Высокий', callback_data='/priority high'),
-                    Button('🔰 Средний', callback_data='/priority medium'),
-                    Button('🐌 Низкий', callback_data='/priority low')
+                    [Button('❗Высокий', callback_data='/priority high')],
+                    [Button('🔰 Средний', callback_data='/priority medium')],
+                    [Button('🐌 Низкий', callback_data='/priority low')]
                 ]
             )
 
@@ -96,8 +125,8 @@ class TaskManagerBot(AssistantBot):
         return SingleAnswer(
             f"Создать задачу?\n{task['title']} ({task['priority']} приоритет)",
             buttons=[
-                Button('✅ Подтвердить', callback_data='/confirm_task'),
-                Button('❌ Отмена', callback_data='/cancel')
+                [Button('✅ Подтвердить', callback_data='/confirm_task')],
+                [Button('❌ Отмена', callback_data='/cancel')]
             ]
         )
 
@@ -112,8 +141,8 @@ class TaskManagerBot(AssistantBot):
             SingleAnswer(
                 "Что дальше?",
                 buttons=[
-                    Button('➕ Новая задача', callback_data='/new_task'),
-                    Button('📋 Список задач', callback_data='/list')
+                    [Button('➕ Новая задача', callback_data='/new_task')],
+                    [Button('📋 Список задач', callback_data='/list')]
                 ]
             )
         ])
@@ -140,7 +169,7 @@ class TaskManagerBot(AssistantBot):
         await self.clear_state()
         return SingleAnswer(
             "❌ Операция отменена",
-            buttons=[Button('Главное меню', callback_data='/start')]
+            buttons=[[Button('Главное меню', callback_data='/start')]]
         )
 
     @AssistantBot.command('/start')

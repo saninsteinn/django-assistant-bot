@@ -10,7 +10,7 @@ from django.conf import settings
 class Bot(models.Model):
     codename = models.CharField(max_length=100, unique=True)
     username = models.CharField(max_length=100, null=True, blank=True)
-    telegram_token = models.CharField(max_length=100)
+    telegram_token = models.CharField(max_length=100, null=True, blank=True)
 
     system_text = models.TextField(null=True, blank=True)
     start_text = models.TextField(null=True, blank=True)

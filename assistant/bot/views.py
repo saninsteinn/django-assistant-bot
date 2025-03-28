@@ -8,6 +8,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django.conf import settings
 
 from assistant.bot.adrf import AsyncMixin
 from assistant.bot.models import Instance, Bot, BotUser
@@ -59,7 +60,16 @@ class BaseAssistantBotView(AsyncMixin, APIView, ABC):
 
     def _get_instance(self, codename: str, platform_codename: str, update: Update):
         chat_id, user = update.chat_id, update.user
-        bot = get_object_or_404(Bot, codename=codename)
+
+        try:
+            bot = Bot.objects.get(codename=codename)
+        except Bot.DoesNotExist:
+            if codename in settings.BOTS:
+                bot = Bot.objects.create(
+                    codename=codename
+                )
+            else:
+                raise
 
         language = user.language_code if user else None
         username = self._get_username(user) if user else None
