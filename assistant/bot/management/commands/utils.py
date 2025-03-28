@@ -3,7 +3,7 @@ from assistant.bot.models import Bot, BotUser, Instance
 
 
 def get_instance(codename: str, platform_codename: str, chat_id: str, user: User):
-    bot = Bot.objects.get(codename=codename)
+    bot, _ = Bot.objects.get_or_create(codename=codename)
 
     language = user.language_code if user else None
     username = _get_username(user) if user else None

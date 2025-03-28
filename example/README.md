@@ -18,8 +18,8 @@ This is a Django project.
 # Run Telegram bot in long polling mode (using Celery)
 ./manage.py telegram_poll task_manager
 
-# Run Telegram bot in synchronous mode (without Celery)
-./manage.py telegram_poll task_manager --sync
+# Run Telegram bot in synchronous mode (without Celery) with auto-reloading for development
+./manage.py telegram_poll task_manager --sync --dev
 ```
 
 > **Note**: The `telegram_poll` command now uses a direct mechanism for receiving updates from Telegram API instead of the python-telegram-bot library.

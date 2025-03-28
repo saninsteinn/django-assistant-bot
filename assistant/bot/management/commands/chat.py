@@ -3,12 +3,16 @@ import logging
 import json
 import os
 import readline
+import sys
 import uuid
+import time
 from datetime import timedelta
+from threading import Thread
 
 from asgiref.sync import sync_to_async
 from django.core.management import BaseCommand
 from django.db.models import Max
+from django.utils import autoreload
 
 from assistant.bot.management.commands.utils import get_instance
 from assistant.bot.models import Message
@@ -19,6 +23,11 @@ from assistant.bot.services.instance_service import InstanceLockAsync
 from assistant.bot.resource_manager import ResourceManager
 
 logger = logging.getLogger(__name__)
+
+# Silence all DEBUG logs in console
+for logger_name in logging.root.manager.loggerDict:
+    logging.getLogger(logger_name).setLevel(logging.WARNING)
+logging.getLogger().setLevel(logging.WARNING)
 
 
 HISTORY_FILE_NAME = ".chat_history.jsonl"
@@ -31,16 +40,43 @@ class Command(BaseCommand):
         parser.add_argument('bot_codename', type=str, help='Bot codename for interaction')
 
     def handle(self, *args, **options):
-        bot_codename = options['bot_codename']
+        self.bot_codename = options['bot_codename']
+        logger.info("Starting chat with auto-reload enabled")
+
+        # Set up the reloader in a separate thread
+        self.should_exit = False
+        reloader_thread = Thread(target=self._run_reloader)
+        reloader_thread.daemon = True
+        reloader_thread.start()
+
+        # Run the chat in the main thread
+        try:
+            self._run_chat()
+        finally:
+            self.should_exit = True
+            reloader_thread.join(timeout=1.0)
+
+    def _run_reloader(self):
+        """Run a custom reloader in a separate thread."""
+        reloader = autoreload.get_reloader()
+        while not self.should_exit:
+            if reloader.should_stop:
+                logger.info("Detected code changes. Restarting chat...")
+                os._exit(3)  # Use the same exit code as Django's autoreloader
+            time.sleep(0.1)
+
+    def _run_chat(self):
         platform_codename = 'console'
         chat_id = str(uuid.uuid4())
 
         # Load history from file
         load_chat_history()
 
-        loop = asyncio.get_event_loop()
+        # Create a new event loop instead of getting the default one
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
 
-        print(f"Interactive chat with bot '{bot_codename}'")
+        print(f"Interactive chat with bot '{self.bot_codename}'")
         while True:
             try:
                 user_message = input("\nYou: ")
@@ -54,7 +90,7 @@ class Command(BaseCommand):
                 log_chat_history("user", user_message)
 
                 # Process message asynchronously
-                loop.run_until_complete(process_message(bot_codename, user_message, chat_id, platform_codename))
+                loop.run_until_complete(process_message(self.bot_codename, user_message, chat_id, platform_codename))
 
             except (KeyboardInterrupt, EOFError):
                 print("\nEnding interactive chat.")

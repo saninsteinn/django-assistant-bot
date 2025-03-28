@@ -1,10 +1,15 @@
 import asyncio
 import logging
+import os
+import sys
+import time
 from typing import Optional
 from datetime import timedelta
+from pathlib import Path
 
 from asgiref.sync import sync_to_async
 from django.core.management import BaseCommand
+from django.utils import autoreload
 from telegram.ext import Application, MessageHandler, CallbackQueryHandler, filters
 
 from assistant.bot.management.commands.utils import get_instance
@@ -23,19 +28,33 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('bot_codename', type=str, help='Bot codename to run')
         parser.add_argument('--sync', action='store_true', help='Run in synchronous mode without Celery')
+        parser.add_argument('--dev', action='store_true', help='Enable development mode with auto-reloading')
 
     def handle(self, *args, **options):
-        bot_codename = options['bot_codename']
-        platform_codename = 'telegram'
+        self.bot_codename = options['bot_codename']
+        self.platform_codename = 'telegram'
         self.sync_mode = options['sync']
+        self.use_reloader = options['dev']
 
+        if self.use_reloader:
+            logger.info("Starting in development mode with auto-reload enabled")
+            # Warning about possible signal handling limitations
+            self.stdout.write(self.style.WARNING(
+                "Auto-reload may have limitations with Telegram's async operations. "
+                "If you encounter errors, try running without --dev flag."
+            ))
+            autoreload.run_with_reloader(self._run_bot)
+        else:
+            self._run_bot()
+
+    def _run_bot(self):
         mode_str = "synchronous" if self.sync_mode else "asynchronous mode via Celery"
-        logger.info(f"Starting bot {bot_codename} in {mode_str}")
+        logger.info(f"Starting bot {self.bot_codename} in {mode_str}")
 
         # Initialize Telegram platform
         try:
-            platform = get_bot_platform(bot_codename, platform_codename)
-            logger.info(f"Telegram platform initialized for bot {bot_codename}")
+            platform = get_bot_platform(self.bot_codename, self.platform_codename)
+            logger.info(f"Telegram platform initialized for bot {self.bot_codename}")
         except Exception as e:
             logger.error(f"Platform initialization error: {e}")
             return
@@ -44,14 +63,51 @@ class Command(BaseCommand):
         application = Application.builder().token(platform.bot.token).build()
 
         # Register handlers
-        application.add_handler(MessageHandler(filters.ALL, self._create_handler(bot_codename)))
-        application.add_handler(CallbackQueryHandler(self._create_handler(bot_codename)))
+        application.add_handler(MessageHandler(filters.ALL, self._create_handler(self.bot_codename)))
+        application.add_handler(CallbackQueryHandler(self._create_handler(self.bot_codename)))
         application.add_error_handler(self._error_handler)
 
         # Start polling
         try:
-            self.stdout.write(f"Bot '{bot_codename}' started in Telegram polling mode")
-            asyncio.run(application.run_polling(allowed_updates=["message", "callback_query"]))
+            self.stdout.write(f"Bot '{self.bot_codename}' started in Telegram polling mode")
+
+            # Different approaches based on whether we're in autoreload mode or not
+            if self.use_reloader:
+                # For autoreload, use a simpler approach to avoid signal handling issues
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
+                # Create our own polling mechanism that doesn't use signal handlers
+                async def simple_polling():
+                    # Start the updater without signal handlers
+                    await application.initialize()
+                    await application.start()
+
+                    # Manual polling loop
+                    try:
+                        await application.updater.start_polling(allowed_updates=["message", "callback_query"])
+                        # Keep the application running
+                        while True:
+                            await asyncio.sleep(1)
+                    except asyncio.CancelledError:
+                        # Handle graceful shutdown
+                        await application.stop()
+                        await application.shutdown()
+
+                # Run our polling function
+                try:
+                    loop.run_until_complete(simple_polling())
+                except KeyboardInterrupt:
+                    # Handle Ctrl+C
+                    tasks = asyncio.all_tasks(loop)
+                    for task in tasks:
+                        task.cancel()
+                    loop.run_until_complete(asyncio.gather(*tasks, return_exceptions=True))
+                    loop.close()
+            else:
+                # Normal mode - use standard polling with signal handling
+                asyncio.run(application.run_polling(allowed_updates=["message", "callback_query"]))
+
         except KeyboardInterrupt:
             self.stdout.write("\nBot stopped by user")
         except Exception as e:
