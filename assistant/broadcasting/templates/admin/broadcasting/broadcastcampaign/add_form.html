@@ -1,0 +1,16 @@
+{% extends "admin/change_form.html" %}
+{% comment %} Simple inheritance for the add view {% endcomment %}
+{% load i18n static %}
+
+{% block form_top %}
+{# Area to display AJAX results #}
+<div id="ajax-test-send-result" style="margin-bottom: 10px; padding: 10px; border-radius: 3px; display: none;"></div>
+{% endblock %}
+
+{% block submit_buttons_bottom %}
+    {# Add the standard submit buttons first #}
+    {{ block.super }}
+
+    {# Include the test send snippet #}
+    {% include "admin/broadcasting/broadcastcampaign/includes/test_send_snippet.html" %}
+{% endblock %}

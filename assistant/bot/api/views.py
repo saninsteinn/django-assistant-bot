@@ -1,27 +1,17 @@
-import asyncio
 import logging
-import time
 from asgiref.sync import sync_to_async, async_to_sync
 
-from django.http import Http404
-from drf_yasg.utils import swagger_auto_schema
-from rest_framework.decorators import action
 from rest_framework.generics import get_object_or_404
-from rest_framework.request import Request
-from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, viewsets, permissions, mixins
 
-from assistant.bot.api.serializers import ChatCompletionRequestSerializer, ChatCompletionResultSerializer, DialogSerializer, \
-    MessageSerializer, AnsweredMessageSerializer
-from assistant.bot.chat_completion import ChatCompletion
-from assistant.bot.domain import MultiPartAnswer, Update
-from assistant.bot.models import Bot, Dialog, Message, Role
-from assistant.bot.resource_manager import ResourceManager
+from assistant.bot.api.serializers import DialogSerializer, \
+    MessageSerializer, AnsweredMessageSerializer, BotSerializer
+from assistant.bot.domain import Update
+from assistant.bot.models import Bot, Dialog, Message
 from assistant.bot.services.dialog_service import create_user_message
-from assistant.bot.services.instance_service import InstanceLockAsync, InstanceLock
+from assistant.bot.services.instance_service import InstanceLock
 from assistant.bot.utils import get_bot_platform, get_bot_class
-from assistant.storage.api.serializers import BotSerializer
 
 logger = logging.getLogger(__name__)
 

@@ -57,16 +57,16 @@ async def _answer_task(bot_codename: str, dialog_id: int, platform_codename: str
             await sync_to_async(dialog.instance.save)(update_fields=['is_unavailable'])
         except Exception as e:
             logger.error(f'Error while sending answer: {e}')
-            try:
-                # Try sending an error message back
-                resource_manager = ResourceManager(
-                    codename=bot_codename,
-                    language='en', # Use default language for error message
-                )
-                error_answer = SingleAnswer(resource_manager.get_phrase('`An error occurred while sending the response\.`'), no_store=True)
-                await _post_answer(platform, update.chat_id, error_answer)
-            except Exception as inner_e:
-                logger.error(f'Failed to send error message back to {update.chat_id}: {inner_e}')
+            # try:
+            #     # Try sending an error message back
+            #     resource_manager = ResourceManager(
+            #         codename=bot_codename,
+            #         language='en', # Use default language for error message
+            #     )
+            #     error_answer = SingleAnswer(resource_manager.get_phrase('`An error occurred while sending the response\.`'), no_store=True)
+            #     await _post_answer(platform, update.chat_id, error_answer)
+            # except Exception as inner_e:
+            #     logger.error(f'Failed to send error message back to {update.chat_id}: {inner_e}')
 
 
 async def _post_answer(platform: BotPlatform, chat_id: str, answer):

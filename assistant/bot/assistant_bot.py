@@ -23,6 +23,7 @@ from assistant.bot.services.dialog_service import get_dialog, create_bot_message
     get_gpt_messages
 from assistant.bot.utils import truncate_text
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -38,6 +39,7 @@ class AssistantBot(Bot):
     bot: BotModel
     bot_user: BotUser
     resource_manager: ResourceManager
+    allowed_commands: Optional[List[str]] = None  # Allowed command prefixes
 
     DEFAULT_LANGUAGE = 'ru'
     SERVICE_TAG_REGEXP = re.compile(r'#service', re.I)
@@ -205,8 +207,9 @@ class AssistantBot(Bot):
 
         except Exception as e:
             logger.exception('Failed to handle dialog')
-            return SingleAnswer(
-                self.resource_manager.get_phrase('`An error occurred while generating the response.`'), no_store=True)
+            return None
+            # return SingleAnswer(
+            #     self.resource_manager.get_phrase('`An error occurred while generating the response.`'), no_store=True)
 
         if await self.has_new_messages(message_id):
             logger.warning(f"User sent new messages during processing.")
@@ -316,6 +319,17 @@ class AssistantBot(Bot):
         )
 
     async def handle_command(self, dialog: Dialog, message_id: int, text) -> Optional[SingleAnswer]:
+        # Check if the command is allowed
+        if self.allowed_commands is not None:
+            is_allowed = False
+            for prefix in self.allowed_commands:
+                if text.startswith(prefix):
+                    is_allowed = True
+                    break
+            if not is_allowed:
+                logger.warning(f"Command '{text}' is not allowed for bot {self.bot.codename}")
+                return None
+
         try:
             if text.startswith('/start'):
                 return await self.command_start(text)
@@ -352,9 +366,9 @@ class AssistantBot(Bot):
             return SingleAnswer("`Unknown command.`", no_store=True)
         except Exception as e:
             logger.exception('Failed to handle command')
-            return SingleAnswer(
-                self.resource_manager.get_phrase('`An error occurred while generating the response.`'), no_store=True
-            )
+            # return SingleAnswer(
+            #     self.resource_manager.get_phrase('`An error occurred while generating the response.`'), no_store=True
+            # )
 
 
     async def command_start(self, text) -> Optional[Answer]:
@@ -456,7 +470,7 @@ class AssistantBot(Bot):
         )
 
     def command_show_wiki(self, text):
-        from assistant.storage.models import WikiDocument
+        from assistant.storage.models import WikiDocument  # do not move this import to the top of the file
         wiki_id = text.split()[1].strip()
         try:
             wiki = WikiDocument.objects.filter(bot=self.bot).get(id=wiki_id)

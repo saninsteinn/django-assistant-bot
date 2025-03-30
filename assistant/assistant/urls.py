@@ -20,6 +20,7 @@ from drf_yasg.generators import OpenAPISchemaGenerator
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
 from rest_framework.authentication import TokenAuthentication
+from django.conf import settings
 
 # from assistant.admin.admin import admin_site
 from assistant.bot.views import TelegramAssistantBotView
@@ -49,10 +50,15 @@ urlpatterns = [
     # path('admin/', admin_site.urls),
     # path('admins/', admin.site.urls),
     path('telegram/<str:codename>/', TelegramAssistantBotView.as_view(), name='telegram_bot'),
-    path('api/v1/', include('assistant.storage.urls')),
-    path('api/v1/', include('assistant.bot.urls')),
     path('api/swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('api/redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
     # path('api-token-auth/', obtain_auth_token, name='api_token_auth'),
-
 ]
+
+# Conditionally add storage URLs
+if 'assistant.storage' in settings.INSTALLED_APPS:
+    urlpatterns.append(path('api/v1/', include('assistant.storage.urls')))
+
+# Conditionally add bot URLs
+if 'assistant.bot' in settings.INSTALLED_APPS:
+    urlpatterns.append(path('api/v1/', include('assistant.bot.urls')))

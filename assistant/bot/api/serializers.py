@@ -113,3 +113,9 @@ class AnsweredMessageSerializer(MessageSerializer):
             id__gt=obj.id
         ).order_by('id')
         return MessageSerializer(answer_messages, many=True).data
+
+
+class BotSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Bot
+        fields = ['codename']
