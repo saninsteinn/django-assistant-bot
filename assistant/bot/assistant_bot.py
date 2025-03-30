@@ -65,6 +65,12 @@ class AssistantBot(Bot):
 
     async def handle_update(self, update: Update) -> Optional[Answer]:
 
+        # Unmark instance if the user writes after being marked as unavailable
+        if self.instance.is_unavailable:
+            logger.info(f"User {update.user.id} sent a message. Unmarking instance {self.instance.id} as available.")
+            self.instance.is_unavailable = False
+            await sync_to_async(self.instance.save)(update_fields=['is_unavailable'])
+
         self.resource_manager = ResourceManager(
             codename=self.bot.codename,
             language=self.bot_user.language or self.DEFAULT_LANGUAGE
@@ -128,9 +134,10 @@ class AssistantBot(Bot):
         message_id = update.message_id
         text = update.text
         photo = update.photo
+        phone_number = update.phone_number
 
-        if not text and not photo:
-            return SingleAnswer("`Sorry, only text messages or photos are supported.`", no_store=True)
+        if not text and not photo and not phone_number:
+            return SingleAnswer("`Sorry, only text messages, photos, or contact shares are supported.`", no_store=True)
 
         if self.instance.state.get('mode') == 'image_creation':
             if text and text.startswith('/'):
@@ -148,6 +155,8 @@ class AssistantBot(Bot):
 
         if text and text.startswith('/'):
             answer = await self.handle_command(dialog, message_id, text)
+        elif phone_number:
+            answer = await self.handle_phone_number(dialog, message_id, phone_number)
         else:
             answer = await self.handle_message(dialog, message_id, text, photo)
 
@@ -189,21 +198,10 @@ class AssistantBot(Bot):
             return
 
         try:
-            # m = {
-            #     'role': 'user',
-            #     'content': user_message.text,
-            # }
-            # if not self.messages or self.messages[-1]['role'] != m['role']:
-            #     self.messages.append(m)
-            # else:
-            #     self.messages[-1] = self._merge_messages(self.messages[-1], m)
-
             async def do_interrupt():
                 return await self.already_answered(user_message)
 
             answer = await self.get_answer_to_messages(self.messages, self.debug_info, do_interrupt)
-
-            # answer.text = await ensure_message_language(answer.text, self.instance.language)
 
         except Exception as e:
             logger.exception('Failed to handle dialog')
@@ -219,6 +217,9 @@ class AssistantBot(Bot):
             return None
 
         return answer
+
+    async def handle_phone_number(self, dialog: Dialog, message_id: int, phone_number: str) -> Optional[SingleAnswer]:
+        raise NotImplementedError('Phone number handling is not implemented yet')
 
     def _merge_messages(self, *messages: GPTMessage) -> GPTMessage:
         return GPTMessage(
@@ -287,7 +288,6 @@ class AssistantBot(Bot):
                 [Button(self.resource_manager.get_phrase(f'Continue'), callback_data='/continue')],
             ] if ai_response.length_limited else None,
         )
-        return answer
 
     def _extract_text_tag(self, text: str) -> Optional[str]:
         tagged_text = extract_tagged_text(text)

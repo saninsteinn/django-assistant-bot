@@ -27,6 +27,9 @@ class Bot(models.Model):
         if self.codename:
             return urljoin(base_callback_url, reverse('telegram_bot', kwargs={'codename': self.codename}))
 
+    def __str__(self):
+        return f'<Bot {self.id} {self.codename}>'
+
 
 class BotUser(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
@@ -34,6 +37,7 @@ class BotUser(models.Model):
     platform = models.CharField(max_length=100)
     username = models.CharField(max_length=100, null=True, blank=True)
     language = models.CharField(max_length=100, null=True, blank=True)
+    phone_number = models.CharField(max_length=20, null=True, blank=True)
 
     def __str__(self):
         return f'<BotUser {self.id} {self.user_id} {self.username}>'
@@ -47,6 +51,7 @@ class Instance(models.Model):
     bot = models.ForeignKey(Bot, on_delete=models.CASCADE)
     user = models.ForeignKey(BotUser, on_delete=models.CASCADE)
     state = models.JSONField(default=dict, blank=True)
+    is_unavailable = models.BooleanField(default=False, db_index=True)
 
     def __str__(self):
         return f'<Instance {self.id} {self.bot.codename} {self.user.username}>'

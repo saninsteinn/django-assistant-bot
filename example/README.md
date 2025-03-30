@@ -6,7 +6,19 @@ This is a Django project.
 
 * create `.env` and fill it
 * run Django server
-* optionally: run `celery -A example worker -Q query` to start the Celery worker to process messages from Telegram
+
+## Celery workers
+
+```bash
+# Queries
+celery -A project worker -Q query
+
+# Broadcasting
+celery -A project worker -Q broadcasting
+
+# Periodic tasks
+celery -A project beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+```
 
 
 ## Useful commands

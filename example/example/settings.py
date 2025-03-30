@@ -76,6 +76,7 @@ INSTALLED_APPS = [
     'assistant.storage',
     # 'assistant.loading',
     # 'assistant.processing',
+    'assistant.broadcasting',
     # 'assistant.rag',
     'assistant.admin',
 ]

@@ -92,6 +92,10 @@ class Command(BaseCommand):
 class ConsolePlatform(BotPlatform):
     """Custom platform for interaction through console."""
 
+    @property
+    def codename(self) -> str:
+        return 'console'
+
     def __init__(self, bot_codename: str):
         self.bot_codename = bot_codename
 

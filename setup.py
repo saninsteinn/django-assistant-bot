@@ -32,6 +32,7 @@ setup(
         'langid == 1.1.6',
         'celery == 5.4.0',
         'celery-pool-asyncio == 0.2.0',
+        'django-celery-beat == 2.7.0',
         'amqp == 5.2.0',
         'propcache == 0.2.1',
         'httpcore == 1.0.6',

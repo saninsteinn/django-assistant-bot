@@ -173,9 +173,9 @@ class Command(BaseCommand):
 
             # Create user message
             user_message = await sync_to_async(create_user_message)(
-                dialog, update.message_id, update.text, update.photo
+                dialog, update.message_id, update.text, update.photo, update.phone_number
             )
-            logger.info(f"Message saved: chat_id={update.chat_id}, text={update.text[:50]}...")
+            logger.info(f"Message saved: chat_id={update.chat_id}, text={update.text[:50] if update.text else 'None'}...")
 
             # Notify typing
             await platform.action_typing(update.chat_id)

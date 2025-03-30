@@ -6,7 +6,7 @@ Django Assistant Bot is a framework for developing assistant bots powered by Dja
 
 The Django Assistant Bot project is organized into several key components that streamline the development of a sophisticated assistant bot.
 
-1. **Assistant Module**: This core module encompasses essential functionalities, including a custom admin interface for managing user interactions and tokens, and an AI integration component that handles dialog management and response generation. It also features middleware for dynamic request handling and a robust document processing system, utilizing asynchronous programming to enhance performance and responsiveness.
+1. **Assistant Module**: This core module encompasses essential functionalities, including a custom admin interface for managing user interactions and tokens, an AI integration component that handles dialog management and response generation, a broadcasting system for sending messages to multiple users, and middleware for dynamic request handling and robust document processing. It leverages asynchronous programming to enhance performance and responsiveness.
 
 2. **Example Module**: Serving as a practical demonstration, this module includes configuration files and task management setups that showcase the bot's capabilities. It provides a template for users to implement and configure their own instances of the assistant bot.
 
@@ -31,6 +31,8 @@ Overall, the project exemplifies a modular architecture, promoting maintainabili
 - **FastAPI-based GPU Service**: A dedicated service for processing machine learning models, offering optimized endpoint access for embedding generation and dialog responses, significantly enhancing AI capabilities.
 
 - **Retrieval-Augmented Generation (RAG)**: Implementation of the RAG architecture that combines document retrieval with language model generation, allowing the bot to provide answers based on specific knowledge bases and documents. This enhances response accuracy and relevance by grounding answers in factual information.
+
+- **Broadcasting**: A module for creating, scheduling, and sending broadcast messages to bot users across different platforms, with administrative controls and status tracking.
 
 - **Demonstrative Example Module**: A practical directory containing configurations and implementations that showcase the bot's features and serve as a template for user customization.
 
@@ -82,37 +84,37 @@ Ensure that any additional system-specific dependencies are satisfied for optima
 To set up the Django Assistant Bot project, follow these steps:
 
 1. **Clone the Repository**: Begin by cloning the project repository to your local machine:
-   
+
    ```bash
    git clone https://github.com/your_username/django-assistant-bot.git
    cd django-assistant-bot
    ```
 
 2. **Create a Virtual Environment** (optional but recommended): It is a good practice to use a virtual environment to manage dependencies for your project:
-   
+
    ```bash
    python -m venv venv
    source venv/bin/activate
    ```
 
 3. **Install Requirements**: Install the project and its dependencies:
-   
+
    ```bash
    pip install .
    ```
-   
+
    This will install the Django Assistant Bot package and all required dependencies.
 
 4. **Configure Environment Variables**: Set up environment variables necessary for the application. You can create a `.env` file in the root directory based on the provided `.env.example` and configure it according to your needs. Key variables include database connection settings, AI model configurations, and service endpoints.
-   
+
 5. **Run Migrations**: Apply database migrations to set up the necessary tables:
-   
+
    ```bash
    python manage.py migrate
    ```
 
 6. **Start the Development Server**: You can now run the application using the following command:
-   
+
    ```bash
    python manage.py runserver
    ```
@@ -120,7 +122,7 @@ To set up the Django Assistant Bot project, follow these steps:
 7. **Access the Application**: Open your web browser and navigate to the application URL to access the Django Assistant Bot interface.
 
 8. **Test the Setup**: Optionally, run the test suite to ensure everything is functioning as expected:
-   
+
    ```bash
    pytest
    ```
@@ -238,4 +240,4 @@ By properly configuring these settings, you will enable the Django Assistant Bot
 The Django Assistant Bot project is made possible by the collaborative efforts of the following team members and contributors:
 
 ### Core Team
-- **Project Lead**: Aleksandr Fedotov - [GitHub Profile](https://github.com/afedotov89)  
+- **Project Lead**: Aleksandr Fedotov - [GitHub Profile](https://github.com/afedotov89)
