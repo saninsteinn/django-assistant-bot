@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 
 import environ
+from celery.schedules import crontab
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -51,6 +52,13 @@ CELERY_BROKER_URL = ENV('CELERY_BROKER_URL')
 CELERY_RESULT_BACKEND = ENV('CELERY_BROKER_URL')
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
+CELERY_BEAT_SCHEDULE = {
+    'broadcast-campaigns': {
+        'task': 'broadcasting.check_scheduled_broadcasts',
+        'schedule': crontab(minute='*'),
+    },
+}
+
 
 
 # Bot configuration
