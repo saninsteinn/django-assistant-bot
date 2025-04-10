@@ -67,9 +67,3 @@ class WikiDocumentSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({"bot": "Bot does not exist."})
             validated_data['bot'] = bot
         return validated_data
-
-
-class BotSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Bot
-        fields = ['codename']

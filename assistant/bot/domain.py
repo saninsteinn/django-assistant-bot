@@ -58,6 +58,24 @@ class CallbackQuery:
 
 
 @dataclasses.dataclass
+class Audio:
+    """Represents an audio file to be sent."""
+    content: bytes
+    filename: Optional[str] = None
+
+    def to_dict(self):
+        return {
+            'content': base64.b64encode(self.content).decode('utf-8'),
+            'filename': self.filename,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict):
+        data['content'] = base64.b64decode(data['content'])
+        return cls(**data)
+
+
+@dataclasses.dataclass
 class Photo:
 
     file_id: str
@@ -75,7 +93,6 @@ class Photo:
         return cls(**data)
 
 
-
 @dataclasses.dataclass
 class Update:
 
@@ -85,6 +102,7 @@ class Update:
     photo: Optional[Photo] = None
     user: Optional[User] = None
     callback_query: Optional[CallbackQuery] = None
+    phone_number: Optional[str] = None
 
     def to_dict(self):
         res = dataclasses.asdict(self)
@@ -105,8 +123,17 @@ class Update:
 @dataclasses.dataclass
 class Button:
     text: str
-    callback_data: str
+    callback_data: str = None
     url: str = None
+    request_contact: bool = None
+    request_location: bool = None
+
+    def to_dict(self):
+        return dataclasses.asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict):
+        return cls(**data)
 
 
 class SingleAnswer:
@@ -121,12 +148,14 @@ class SingleAnswer:
     usage: List[Dict]
     no_store: bool
     debug_info: Dict
+    audio: Optional[Audio]
 
     _raw_text: str
 
     def __init__(self, text: str = None, thinking: str = None, image_url: str = None, is_markdown: bool = False, reply_keyboard: Any = None,
                  buttons: List[List[Button]] = None, state: Dict = None,
-                 raw_text: str = None, usage: List[Dict] = None, debug_info: Dict = None, no_store: bool = False):
+                 raw_text: str = None, usage: List[Dict] = None, debug_info: Dict = None, no_store: bool = False,
+                 audio: Optional[Audio] = None):
         self.text = text
         self.thinking = thinking
         self.image_url = image_url
@@ -138,6 +167,7 @@ class SingleAnswer:
         self.debug_info = debug_info or {}
         self.no_store = no_store
         self._raw_text = raw_text
+        self.audio = audio
 
     @property
     def raw_text(self):
@@ -152,6 +182,36 @@ class SingleAnswer:
     @property
     def final_model(self):
         return self.usage[-1].get('model') if self.usage else None
+
+    def to_dict(self) -> Dict:
+        """Serializes the SingleAnswer instance to a dictionary."""
+        return {
+            'text': self.text,
+            'thinking': self.thinking,
+            'image_url': self.image_url,
+            'is_markdown': self.is_markdown,
+            'reply_keyboard': self.reply_keyboard,
+            'buttons': [[button.to_dict() for button in row] for row in self.buttons] if self.buttons else None,
+            'state': self.state,
+            'usage': self.usage,
+            'debug_info': self.debug_info,
+            'no_store': self.no_store,
+            'raw_text': self._raw_text,
+            'audio': self.audio.to_dict() if self.audio else None,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict) -> 'SingleAnswer':
+        """Deserializes a dictionary into a SingleAnswer instance."""
+        if 'buttons' in data and data['buttons']:
+            data['buttons'] = [[Button.from_dict(b) for b in row] for row in data['buttons']]
+        if 'audio' in data and data['audio']:
+            data['audio'] = Audio.from_dict(data['audio'])
+        raw_text = data.pop('raw_text', None)
+        instance = cls(**data)
+        if raw_text:
+            instance.raw_text = raw_text
+        return instance
 
 
 class MultiPartAnswer:
@@ -188,11 +248,40 @@ class MultiPartAnswer:
         for part in self.parts:
             part.no_store = value
 
+    def to_dict(self) -> Dict:
+        """Serializes the MultiPartAnswer instance to a dictionary."""
+        return {
+            'parts': [part.to_dict() for part in self.parts],
+            'no_store': self.no_store,
+            'state': self.state,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict) -> 'MultiPartAnswer':
+        """Deserializes a dictionary into a MultiPartAnswer instance."""
+        parts_data = data.pop('parts', [])
+        parts = [SingleAnswer.from_dict(part_data) for part_data in parts_data]
+        return cls(parts=parts, **data)
+
 
 Answer = Union[SingleAnswer, MultiPartAnswer]
 
 
+def answer_from_dict(data: Dict) -> Answer:
+    """Deserializes a dictionary into a SingleAnswer or MultiPartAnswer based on structure."""
+    if 'parts' in data:
+        return MultiPartAnswer.from_dict(data)
+    else:
+        return SingleAnswer.from_dict(data)
+
+
 class BotPlatform(ABC):
+
+    @property
+    @abstractmethod
+    def codename(self) -> str:
+        """Returns the unique codename for this platform (e.g., 'telegram', 'console')."""
+        pass
 
     @abstractmethod
     async def get_update(self, request: Request) -> Update:

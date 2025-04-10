@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 
 import environ
+from celery.schedules import crontab
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -36,7 +37,7 @@ DEBUG = ENV.bool('DEBUG', default=False)
 
 ALLOWED_HOSTS = ENV('ALLOWED_HOSTS').split(',')
 
-TELEGRAM_BASE_CALLBACK_URL = ENV.str('TELEGRAM_BASE_CALLBACK_URL')
+TELEGRAM_BASE_CALLBACK_URL = ENV.str('TELEGRAM_BASE_CALLBACK_URL', default=None)
 
 # Database
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
@@ -51,10 +52,21 @@ CELERY_BROKER_URL = ENV('CELERY_BROKER_URL')
 CELERY_RESULT_BACKEND = ENV('CELERY_BROKER_URL')
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
+CELERY_BEAT_SCHEDULE = {
+    'broadcast-campaigns': {
+        'task': 'broadcasting.check_scheduled_broadcasts',
+        'schedule': crontab(minute='*'),
+    },
+}
 
 
-BOT_CLASSES = {
-    'task_manager': 'bot.bot.TaskManagerBot',
+
+# Bot configuration
+BOTS = {
+    'task_manager': {
+        'class': 'bot.bot.TaskManagerBot',
+        'telegram_token': ENV.str('TASK_MANAGER_BOT_TOKEN', default=None),
+    },
 }
 
 
@@ -72,6 +84,7 @@ INSTALLED_APPS = [
     'assistant.storage',
     # 'assistant.loading',
     # 'assistant.processing',
+    'assistant.broadcasting',
     # 'assistant.rag',
     'assistant.admin',
 ]
@@ -147,3 +160,50 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# Logging configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'DEBUG' if DEBUG else 'INFO',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
+        'bot': {
+            'handlers': ['console'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
+        'assistant': {
+            'handlers': ['console'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
+    },
+}
+
+

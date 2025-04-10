@@ -15,7 +15,7 @@ loglevel = os.getenv("GPU_SERVICE_LOG_LEVEL", "info")
 worker_class = "uvicorn.workers.UvicornWorker"
 wsgi_app = "main:app"
 
-# Дополнительные настройки для логирования
+# Additional logging settings
 logger = logging.getLogger("gunicorn.error")
 logger.setLevel(logging.DEBUG)
 

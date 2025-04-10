@@ -1,0 +1,33 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+{% load admin_urls %}
+
+{% block object-tools-items %}
+    {# Add standard object tools #}
+    {{ block.super }}
+
+    {# Add custom test send form/button if context allows #}
+    {% if show_test_send %}
+        <li>
+            {# Use a simple form for the test send action #}
+            <form action="{{ test_send_url }}" method="post" style="display: inline-block; margin-left: 10px; vertical-align: middle;">
+                {% csrf_token %}
+                <label for="id_test_username" style="margin-right: 5px;">{% trans 'Test Username:' %}</label>
+                <input type="text" name="test_username" id="id_test_username" required style="margin-right: 5px;" aria-label="{% trans 'Test Username' %}">
+                <button type="submit" class="button">{% trans 'Send Test Message' %}</button>
+            </form>
+        </li>
+    {% endif %}
+{% endblock %}
+
+{% block form_top %}
+    {# Area to display AJAX results - Necessary for the snippet #}
+    <div id="ajax-test-send-result" style="margin-bottom: 10px; padding: 10px; border-radius: 3px; display: none;"></div>
+{% endblock %}
+
+{% block submit_buttons_bottom %}
+    {{ block.super }}
+
+    {# Include the test send snippet #}
+    {% include "admin/broadcasting/broadcastcampaign/includes/test_send_snippet.html" %}
+{% endblock %}

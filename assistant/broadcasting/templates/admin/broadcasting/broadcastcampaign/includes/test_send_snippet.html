@@ -1,0 +1,135 @@
+{% load i18n static %}
+
+{# Div for the AJAX test send functionality - Reverted Layout #}
+<div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #ccc;">
+    <label for="id_ajax_test_username" style="margin-right: 5px;">{% trans 'Test Username:' %}</label>
+    <input type="text" id="id_ajax_test_username" name="_ajax_test_username" style="margin-right: 5px;">
+    <button type="button" id="ajax-test-send-button" class="button default" style="padding: 10px 15px;">{% trans 'Send Test Message' %}</button>
+    <img id="ajax-test-send-spinner" src="{% static 'admin/img/gis/loading.gif' %}" alt="Loading..." style="display: none; vertical-align: middle; margin-left: 5px;">
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const sendButton = document.getElementById('ajax-test-send-button');
+    const usernameInput = document.getElementById('id_ajax_test_username');
+    const resultDiv = document.getElementById('ajax-test-send-result'); // Assuming result div exists outside this snippet
+    const spinner = document.getElementById('ajax-test-send-spinner');
+
+    // Get form elements (adjust selectors if needed based on your actual form field IDs)
+    const botSelect = document.getElementById('id_bot');
+    const platformSelect = document.getElementById('id_platform');
+    const messageTextarea = document.getElementById('id_message_text');
+
+    // Get CSRF token - Assuming it's available in the main template
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    // Get the AJAX URL (replace with the actual name if different)
+    const ajaxUrl = "{% url 'admin:broadcasting_broadcastcampaign_ajax_send_test' %}";
+
+    // --- LocalStorage for Test Username ---
+    const storageKey = 'broadcastTestUsername';
+
+    // Load saved username on page load
+    const savedUsername = localStorage.getItem(storageKey);
+    if (savedUsername) {
+        usernameInput.value = savedUsername;
+    }
+
+    // Save username on input change
+    usernameInput.addEventListener('input', function() {
+        localStorage.setItem(storageKey, usernameInput.value);
+    });
+    // --- End LocalStorage ---
+
+    sendButton.addEventListener('click', function() {
+        const botId = botSelect.value;
+        const platformCode = platformSelect.value;
+        const messageText = messageTextarea.value;
+        const testUsername = usernameInput.value.trim();
+
+        // Basic validation
+        if (!botId) {
+            alert('{% trans "Please select a Bot." %}');
+            return;
+        }
+         if (!platformCode) {
+            alert('{% trans "Please select a Platform." %}');
+            return;
+        }
+        if (!messageText) {
+            alert('{% trans "Message text cannot be empty." %}');
+            return;
+        }
+        if (!testUsername) {
+            alert('{% trans "Test username cannot be empty." %}');
+            return;
+        }
+
+        // Show spinner and disable button
+        spinner.style.display = 'inline-block';
+        sendButton.disabled = true;
+        if (resultDiv) { // Check if resultDiv exists before manipulating
+             resultDiv.style.display = 'none'; // Hide previous result
+        }
+
+
+        const payload = {
+            bot_id: botId,
+            platform_code: platformCode,
+            message_text: messageText,
+            test_username: testUsername
+        };
+
+        fetch(ajaxUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(response => response.json())
+        .then(data => {
+             if (resultDiv) { // Check if resultDiv exists
+                 resultDiv.textContent = data.message;
+                 if (data.status === 'success') {
+                     resultDiv.style.backgroundColor = '#dff0d8'; // Light green
+                     resultDiv.style.color = '#3c763d';
+                     resultDiv.style.borderColor = '#d6e9c6';
+                 } else if (data.status === 'warning'){
+                     resultDiv.style.backgroundColor = '#fcf8e3'; // Light yellow
+                     resultDiv.style.color = '#8a6d3b';
+                     resultDiv.style.borderColor = '#faebcc';
+                 } else { // error
+                     resultDiv.style.backgroundColor = '#f2dede'; // Light red
+                     resultDiv.style.color = '#a94442';
+                     resultDiv.style.borderColor = '#ebccd1';
+                 }
+                 resultDiv.style.display = 'block';
+             } else {
+                 // Fallback if resultDiv is not found (e.g., simple alert)
+                 alert(data.message);
+             }
+
+        })
+        .catch(error => {
+            console.error('Error:', error);
+             const errorMsg = '{% trans "An unexpected network or script error occurred." %}';
+             if (resultDiv) { // Check if resultDiv exists
+                 resultDiv.textContent = errorMsg;
+                 resultDiv.style.backgroundColor = '#f2dede';
+                 resultDiv.style.color = '#a94442';
+                 resultDiv.style.borderColor = '#ebccd1';
+                 resultDiv.style.display = 'block';
+             } else {
+                 alert(errorMsg);
+             }
+        })
+        .finally(() => {
+            // Hide spinner and re-enable button
+            spinner.style.display = 'none';
+            sendButton.disabled = false;
+        });
+    });
+});
+</script>

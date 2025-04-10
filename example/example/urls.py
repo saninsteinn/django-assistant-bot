@@ -20,5 +20,5 @@ import assistant.assistant.urls
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('assistant.assistant.urls'))
+    path('', include('assistant.assistant.urls')),
 ]

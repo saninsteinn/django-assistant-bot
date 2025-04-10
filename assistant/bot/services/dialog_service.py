@@ -88,18 +88,24 @@ def get_last_message(dialog: Dialog) -> Optional[Message]:
     return last_message
 
 
-def create_user_message(dialog: Dialog, message_id: int, text: str = None, photo: Photo = None) -> Message:
+def create_user_message(dialog: Dialog, message_id: int, text: str = None, photo: Photo = None, phone_number: str = None) -> Message:
     user_role, _ = Role.objects.get_or_create(name='user')
 
     photo_file: ContentFile = None
     if photo:
         image_file = io.BytesIO(photo.content)
         logger.debug(f'Image file size: {len(image_file.getvalue())}')
-        # Создание InMemoryUploadedFile
+        # Create InMemoryUploadedFile
         photo_file = ContentFile(
             image_file.getvalue(),
             name=f"{photo.file_id}.{photo.extension}"
         )
+
+    # If phone number is provided, add it to the text
+    if phone_number and not text:
+        text = f"Phone number: {phone_number}"
+    elif phone_number:
+        text = f"{text}\nPhone number: {phone_number}"
 
     m, _ = Message.objects.get_or_create(
         dialog=dialog,

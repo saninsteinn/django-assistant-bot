@@ -3,12 +3,17 @@ import logging
 import json
 import os
 import readline
+import sys
 import uuid
+import time
+import signal
 from datetime import timedelta
+from threading import Thread
 
 from asgiref.sync import sync_to_async
 from django.core.management import BaseCommand
 from django.db.models import Max
+from django.utils import autoreload
 
 from assistant.bot.management.commands.utils import get_instance
 from assistant.bot.models import Message
@@ -20,32 +25,50 @@ from assistant.bot.resource_manager import ResourceManager
 
 logger = logging.getLogger(__name__)
 
+# Silence all DEBUG logs in console
+for logger_name in logging.root.manager.loggerDict:
+    logging.getLogger(logger_name).setLevel(logging.WARNING)
+logging.getLogger().setLevel(logging.WARNING)
+
 
 HISTORY_FILE_NAME = ".chat_history.jsonl"
 
 
 class Command(BaseCommand):
-    help = 'Интерактивное взаимодействие с ботом через консоль для отладки'
+    help = 'Interactive interaction with bot through console for debugging'
 
     def add_arguments(self, parser):
-        parser.add_argument('bot_codename', type=str, help='Кодовое имя бота для взаимодействия')
+        parser.add_argument('bot_codename', type=str, help='Bot codename for interaction')
 
     def handle(self, *args, **options):
-        bot_codename = options['bot_codename']
+        self.bot_codename = options['bot_codename']
+        logger.info("Starting chat with auto-reload enabled")
+
+        # Use Django's built-in autoreload functionality
+        autoreload.run_with_reloader(self._run_chat_main)
+
+    def _run_chat_main(self):
+        """Main entry point that will be run by the reloader."""
+        # The bot_codename is already set in handle() before autoreloading
+        self._run_chat()
+
+    def _run_chat(self):
         platform_codename = 'console'
         chat_id = str(uuid.uuid4())
 
         # Load history from file
         load_chat_history()
 
-        loop = asyncio.get_event_loop()
+        # Create a new event loop instead of getting the default one
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
 
-        print(f"Интерактивный чат с ботом '{bot_codename}'")
+        print(f"Interactive chat with bot '{self.bot_codename}'")
         while True:
             try:
-                user_message = input("\nВы: ")
-                if user_message.lower() in ('exit', 'quit', 'выход'):
-                    print("Завершение интерактивного чата.")
+                user_message = input("\nYou: ")
+                if user_message.lower() in ('exit', 'quit', 'exit'):
+                    print("Ending interactive chat.")
                     break
 
                 readline.add_history(user_message)
@@ -53,16 +76,25 @@ class Command(BaseCommand):
                 # Log the user message
                 log_chat_history("user", user_message)
 
-                # Обрабатываем сообщение асинхронно
-                loop.run_until_complete(process_message(bot_codename, user_message, chat_id, platform_codename))
+                # Process message asynchronously
+                loop.run_until_complete(process_message(self.bot_codename, user_message, chat_id, platform_codename))
 
             except (KeyboardInterrupt, EOFError):
-                print("\nЗавершение интерактивного чата.")
+                print("\nEnding interactive chat.")
                 break
+
+        # Ensure we properly close the loop
+        loop.close()
+        # Send SIGTERM to self to exit completely
+        os.kill(os.getpid(), signal.SIGTERM)
 
 
 class ConsolePlatform(BotPlatform):
-    """Кастомная платформа для взаимодействия через консоль."""
+    """Custom platform for interaction through console."""
+
+    @property
+    def codename(self) -> str:
+        return 'console'
 
     def __init__(self, bot_codename: str):
         self.bot_codename = bot_codename
@@ -74,10 +106,10 @@ class ConsolePlatform(BotPlatform):
         elif isinstance(answer, SingleAnswer):
             self._print_single_answer(answer)
         else:
-            print(f"Бот отправил неизвестный тип ответа: {answer}")
+            print(f"Bot sent unknown response type: {answer}")
 
     def _print_single_answer(self, answer: SingleAnswer):
-        print(f"Бот: {answer.text}")
+        print(f"Bot: {answer.text}")
         # Log the bot answer
         log_kwargs = {}
         if answer.buttons:
@@ -113,7 +145,7 @@ class ConsolePlatform(BotPlatform):
         log_chat_history("assistant", answer.text, **log_kwargs)
 
     async def get_update(self, request):
-        pass  # Не используется в этом контексте
+        pass  # Not used in this context
 
     async def action_typing(self, chat_id):
         pass
@@ -121,25 +153,25 @@ class ConsolePlatform(BotPlatform):
 
 async def process_message(bot_codename: str, user_message: str, chat_id: str, platform_codename: str = 'console'):
 
-    # Создаем объект Update
+    # Create Update object
     user = User(
         id=chat_id,
         username='tester',
-        first_name='Тест',
-        last_name='Пользователь',
+        first_name='Test',
+        last_name='User',
         language_code='ru',
     )
 
-    # Используем кастомную платформу
+    # Use custom platform
     platform = ConsolePlatform(bot_codename=bot_codename)
 
-    # Получаем или создаем экземпляр бота
+    # Get or create bot instance
     instance = await sync_to_async(get_instance)(bot_codename, platform_codename, chat_id, user)
 
-    # Получаем диалог
+    # Get dialog
     dialog = await sync_to_async(get_dialog)(instance, timedelta(days=1))
 
-    # Создаем экземпляр бота
+    # Create bot instance
     bot_cls = get_bot_class(bot_codename)
     bot = bot_cls(
         dialog=dialog,
@@ -157,7 +189,7 @@ async def process_message(bot_codename: str, user_message: str, chat_id: str, pl
         text=user_message,
     )
 
-    # создаем сообщение
+    # create message
     user_message = await sync_to_async(create_user_message)(dialog, update.message_id, update.text, update.photo)
 
     async with InstanceLockAsync(instance):
@@ -203,7 +235,7 @@ def load_chat_history():
                 for line in f:
                     try:
                         record = json.loads(line.strip())
-                        if record.get("role") == "user":  # Добавляем в историю только сообщения пользователя
+                        if record.get("role") == "user":  # Add only user messages to history
                             readline.add_history(record.get("text", ""))
                     except json.JSONDecodeError:
                         continue

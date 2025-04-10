@@ -18,7 +18,7 @@ app.conf.update(
 
 @signals.setup_logging.connect
 def on_celery_setup_logging(**kwargs):
-    dictConfig(settings.CELERY_LOGGING)
+    dictConfig(settings.LOGGING)
 
 
 app.autodiscover_tasks()

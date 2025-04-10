@@ -13,7 +13,6 @@ from django.conf import settings
 from assistant.ai.dialog import AIDialog
 from assistant.ai.domain import AIResponse, Message as GPTMessage
 from assistant.ai.services.ai_service import extract_tagged_text, get_ai_provider
-from assistant.bot.chat_completion import ChatCompletion
 from assistant.bot.domain import Bot, Update, Answer, MultiPartAnswer, NoMessageFound, SingleAnswer, \
     Button, User, BotPlatform, Photo
 
@@ -23,7 +22,7 @@ from assistant.bot.resource_manager import ResourceManager
 from assistant.bot.services.dialog_service import get_dialog, create_bot_message, create_user_message, have_existing_answers, \
     get_gpt_messages
 from assistant.bot.utils import truncate_text
-from assistant.storage.models import Document, WikiDocument
+
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +39,7 @@ class AssistantBot(Bot):
     bot: BotModel
     bot_user: BotUser
     resource_manager: ResourceManager
+    allowed_commands: Optional[List[str]] = None  # Allowed command prefixes
 
     DEFAULT_LANGUAGE = 'ru'
     SERVICE_TAG_REGEXP = re.compile(r'#service', re.I)
@@ -56,9 +56,9 @@ class AssistantBot(Bot):
     @classmethod
     def command(cls, pattern: str):
         """
-        Декоратор для регистрации команды.
+        Decorator for registering a command.
 
-        :param pattern: Строка регулярного выражения для команды.
+        :param pattern: Regular expression string for the command.
         """
         def decorator(func: Callable):
             cls._command_handlers.append((re.compile(pattern), func))
@@ -66,6 +66,12 @@ class AssistantBot(Bot):
         return decorator
 
     async def handle_update(self, update: Update) -> Optional[Answer]:
+
+        # Unmark instance if the user writes after being marked as unavailable
+        if self.instance.is_unavailable:
+            logger.info(f"User {update.user.id} sent a message. Unmarking instance {self.instance.id} as available.")
+            self.instance.is_unavailable = False
+            await sync_to_async(self.instance.save)(update_fields=['is_unavailable'])
 
         self.resource_manager = ResourceManager(
             codename=self.bot.codename,
@@ -79,7 +85,7 @@ class AssistantBot(Bot):
                 update.user.username in whitelist
             ):
                 return SingleAnswer(
-                    "`Требуется авторизация.`",
+                    "`Authorization required.`",
                     no_store=True,
                 )
 
@@ -130,13 +136,10 @@ class AssistantBot(Bot):
         message_id = update.message_id
         text = update.text
         photo = update.photo
+        phone_number = update.phone_number
 
-        if not text and not photo:
-            # return Answer("`Sorry, only text messages are supported.`")
-            if self.vision_enabled:
-                return SingleAnswer("`Извините, поддерживаются только текстовые сообщения или фото.`", no_store=True)
-            else:
-                return SingleAnswer("`Извините, поддерживаются только текстовые сообщения.`", no_store=True)
+        if not text and not photo and not phone_number:
+            return SingleAnswer("`Sorry, only text messages, photos, or contact shares are supported.`", no_store=True)
 
         if self.instance.state.get('mode') == 'image_creation':
             if text and text.startswith('/'):
@@ -154,6 +157,8 @@ class AssistantBot(Bot):
 
         if text and text.startswith('/'):
             answer = await self.handle_command(dialog, message_id, text)
+        elif phone_number:
+            answer = await self.handle_phone_number(dialog, message_id, phone_number)
         else:
             answer = await self.handle_message(dialog, message_id, text, photo)
 
@@ -195,26 +200,16 @@ class AssistantBot(Bot):
             return
 
         try:
-            # m = {
-            #     'role': 'user',
-            #     'content': user_message.text,
-            # }
-            # if not self.messages or self.messages[-1]['role'] != m['role']:
-            #     self.messages.append(m)
-            # else:
-            #     self.messages[-1] = self._merge_messages(self.messages[-1], m)
-
             async def do_interrupt():
                 return await self.already_answered(user_message)
 
             answer = await self.get_answer_to_messages(self.messages, self.debug_info, do_interrupt)
 
-            # answer.text = await ensure_message_language(answer.text, self.instance.language)
-
         except Exception as e:
             logger.exception('Failed to handle dialog')
-            return SingleAnswer(
-                self.resource_manager.get_phrase('`An error occurred while generating the response.`'), no_store=True)
+            return None
+            # return SingleAnswer(
+            #     self.resource_manager.get_phrase('`An error occurred while generating the response.`'), no_store=True)
 
         if await self.has_new_messages(message_id):
             logger.warning(f"User sent new messages during processing.")
@@ -225,6 +220,9 @@ class AssistantBot(Bot):
             return None
 
         return answer
+
+    async def handle_phone_number(self, dialog: Dialog, message_id: int, phone_number: str) -> Optional[SingleAnswer]:
+        raise NotImplementedError('Phone number handling is not implemented yet')
 
     def _merge_messages(self, *messages: GPTMessage) -> GPTMessage:
         return GPTMessage(
@@ -243,6 +241,7 @@ class AssistantBot(Bot):
         return answered
 
     async def get_answer_to_messages(self, messages, debug_info, do_interrupt) -> Answer:
+        from assistant.bot.chat_completion import ChatCompletion
         chat_completion = ChatCompletion(
             bot=self.bot,
             fast_ai_model=self._get_fast_ai_model(),
@@ -256,7 +255,7 @@ class AssistantBot(Bot):
         return answer
 
     def _extract_thinking_tag(self, text: str) -> Optional[str]:
-        # Извлекаем контент между <think> и </think>
+        # Extract content between <think> and </think>
         match = re.search(r'<think>(.*?)</think>', text, flags=re.DOTALL)
         return match.group(1).strip() if match else None
 
@@ -266,13 +265,13 @@ class AssistantBot(Bot):
     def _ai_response_to_answer(self, ai_response: AIResponse) -> Optional[Answer]:
         original_text = ai_response.result
 
-        # Извлекаем аналитическую часть
+        # Extract analytical part
         thinking = self._extract_thinking_tag(original_text)
 
-        # Удаляем все thinking-теги из текста
+        # Remove all thinking tags from text
         cleaned_text = self._clean_thinking(original_text)
 
-        # Обрабатываем основной текст (существующая логика)
+        # Process main text (existing logic)
         if text_tag := self._extract_text_tag(cleaned_text):
             cleaned_text = text_tag
 
@@ -292,7 +291,6 @@ class AssistantBot(Bot):
                 [Button(self.resource_manager.get_phrase(f'Continue'), callback_data='/continue')],
             ] if ai_response.length_limited else None,
         )
-        return answer
 
     def _extract_text_tag(self, text: str) -> Optional[str]:
         tagged_text = extract_tagged_text(text)
@@ -321,14 +319,22 @@ class AssistantBot(Bot):
         )
 
     async def handle_command(self, dialog: Dialog, message_id: int, text) -> Optional[SingleAnswer]:
+        # Check if the command is allowed
+        if self.allowed_commands is not None:
+            is_allowed = False
+            for prefix in self.allowed_commands:
+                if text.startswith(prefix):
+                    is_allowed = True
+                    break
+            if not is_allowed:
+                logger.warning(f"Command '{text}' is not allowed for bot {self.bot.codename}")
+                return None
+
         try:
             if text.startswith('/start'):
                 return await self.command_start(text)
             elif text == '/help':
-                if text := self.bot.help_text:
-                    return SingleAnswer(text, no_store=True)
-                else:
-                    return
+                return await self.command_help()
             elif text == '/continue':
                 return await self.command_continue(dialog, message_id)
             elif text == '/test_message':
@@ -351,18 +357,18 @@ class AssistantBot(Bot):
                 for pattern, handler in self._command_handlers:
                     match = pattern.match(text)
                     if match:
-                        # Определяем, является ли обработчик асинхронным
+                        # Determine if the handler is asynchronous
                         if asyncio.iscoroutinefunction(handler):
                             return await handler(self, match, message_id)
                         else:
                             return await sync_to_async(handler)(self, match, message_id)
 
-            return SingleAnswer("`Команда неизвестна.`", no_store=True)
+            return SingleAnswer("`Unknown command.`", no_store=True)
         except Exception as e:
             logger.exception('Failed to handle command')
-            return SingleAnswer(
-                self.resource_manager.get_phrase('`An error occurred while generating the response.`'), no_store=True
-            )
+            # return SingleAnswer(
+            #     self.resource_manager.get_phrase('`An error occurred while generating the response.`'), no_store=True
+            # )
 
 
     async def command_start(self, text) -> Optional[Answer]:
@@ -378,7 +384,7 @@ class AssistantBot(Bot):
 
     def command_new_dialog(self) -> SingleAnswer:
         Dialog.objects.filter(instance=self.instance, is_completed=False).update(is_completed=True)
-        return SingleAnswer("`Новый диалог начат.`", no_store=True)
+        return SingleAnswer("`New dialog started.`", no_store=True)
 
     def command_show_dialogs(self):
         dialogs = Dialog.objects.annotate(messages_count=Count('messages')).filter(messages_count__gt=0).order_by(
@@ -444,6 +450,7 @@ class AssistantBot(Bot):
         )
 
     def command_show_document(self, text):
+        from assistant.storage.models import Document
         doc_id = text.split()[1].strip()
         try:
             doc = Document.objects.filter(wiki__bot=self.bot).select_related('wiki').get(id=doc_id)
@@ -463,6 +470,7 @@ class AssistantBot(Bot):
         )
 
     def command_show_wiki(self, text):
+        from assistant.storage.models import WikiDocument  # do not move this import to the top of the file
         wiki_id = text.split()[1].strip()
         try:
             wiki = WikiDocument.objects.filter(bot=self.bot).get(id=wiki_id)
@@ -502,3 +510,8 @@ class AssistantBot(Bot):
         await sync_to_async(
             lambda: self.instance.save(update_fields=['state'])
         )()
+
+    async def command_help(self) -> Optional[SingleAnswer]:
+        if text := self.bot.help_text:
+            return SingleAnswer(text, no_store=True)
+        return None

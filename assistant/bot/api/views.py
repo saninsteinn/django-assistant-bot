@@ -1,27 +1,17 @@
-import asyncio
 import logging
-import time
 from asgiref.sync import sync_to_async, async_to_sync
 
-from django.http import Http404
-from drf_yasg.utils import swagger_auto_schema
-from rest_framework.decorators import action
 from rest_framework.generics import get_object_or_404
-from rest_framework.request import Request
-from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, viewsets, permissions, mixins
 
-from assistant.bot.api.serializers import ChatCompletionRequestSerializer, ChatCompletionResultSerializer, DialogSerializer, \
-    MessageSerializer, AnsweredMessageSerializer
-from assistant.bot.chat_completion import ChatCompletion
-from assistant.bot.domain import MultiPartAnswer, Update
-from assistant.bot.models import Bot, Dialog, Message, Role
-from assistant.bot.resource_manager import ResourceManager
+from assistant.bot.api.serializers import DialogSerializer, \
+    MessageSerializer, AnsweredMessageSerializer, BotSerializer
+from assistant.bot.domain import Update
+from assistant.bot.models import Bot, Dialog, Message
 from assistant.bot.services.dialog_service import create_user_message
-from assistant.bot.services.instance_service import InstanceLockAsync, InstanceLock
+from assistant.bot.services.instance_service import InstanceLock
 from assistant.bot.utils import get_bot_platform, get_bot_class
-from assistant.storage.api.serializers import BotSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -131,10 +121,10 @@ class DialogViewSet(viewsets.ModelViewSet):
     # @action(detail=True, methods=['post'])
     # def run(self, request, pk=None):
     #     dialog = self.get_object()
-    #     # Получаем все сообщения в диалоге
+    #     # Get all messages in the dialog
     #     messages = dialog.messages.all().order_by('created_at')
     #
-    #     # Подготавливаем историю диалога для модели ИИ
+    #     # Prepare dialog history for AI model
     #     conversation = []
     #     for message in messages:
     #         conversation.append({
@@ -142,25 +132,25 @@ class DialogViewSet(viewsets.ModelViewSet):
     #             'content': message.content
     #         })
     #
-    #     # Вызываем модель ИИ для генерации ответа
+    #     # Call AI model to generate response
     #     assistant_response = self.generate_assistant_response(conversation)
     #
-    #     # Сохраняем ответ ассистента как новое сообщение
+    #     # Save assistant's response as a new message
     #     Message.objects.create(
     #         dialog=dialog,
     #         role='assistant',
     #         content=assistant_response
     #     )
     #
-    #     # Возвращаем обновленный диалог
+    #     # Return updated dialog
     #     serializer = self.get_serializer(dialog)
     #     return Response(serializer.data)
     #
     # def generate_assistant_response(self, conversation):
-    #     # Здесь интегрируйте вашу модель ИИ для генерации ответа
-    #     # Пример с использованием последнего сообщения пользователя
+    #     # Here integrate your AI model for generating response
+    #     # Example with using the last user message
     #     last_user_message = conversation[-1]['content'] if conversation else ''
-    #     return f"Ответ ассистента на: {last_user_message}"
+    #     return f"Assistant's response to: {last_user_message}"
 
 
 class MessageViewSet(mixins.CreateModelMixin,
